@@ -1,0 +1,156 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  memberships LeagueMembership[]
+  picks       Pick[]
+}
+
+model League {
+  id           String   @id @default(cuid())
+  name         String
+  inviteCode   String   @unique
+  sport        Sport    @default(NFL)
+  pickFormat   PickFormat @default(FIVE_GAMES)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String
+  
+  memberships  LeagueMembership[]
+  weeks        Week[]
+  settings     LeagueSettings?
+}
+
+model LeagueSettings {
+  id              String  @id @default(cuid())
+  leagueId        String  @unique
+  league          League  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  
+  // Picking rules
+  numGamesPerWeek Int     @default(5)
+  pickPrimeTimeOnly Boolean @default(false)
+  pickAllGames    Boolean @default(false)
+  
+  // Scoring
+  pointsPerWin    Float   @default(1)
+  pointsPerLoss   Float   @default(-1)
+  pointsPerPush   Float   @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model LeagueMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  leagueId  String
+  role      Role     @default(MEMBER)
+  points    Float    @default(0)
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, leagueId])
+}
+
+model Week {
+  id        String   @id @default(cuid())
+  leagueId  String
+  weekNum   Int
+  season    Int
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  games     Game[]
+  
+  @@unique([leagueId, season, weekNum])
+}
+
+model Game {
+  id            String   @id @default(cuid())
+  weekId        String
+  externalId    String?  @unique // From odds scraper
+  
+  homeTeam      String
+  awayTeam      String
+  homeSpread    Float
+  awaySpread    Float
+  gameTime      DateTime
+  
+  isPrimeTime   Boolean  @default(false)
+  isFinished    Boolean  @default(false)
+  
+  homeScore     Int?
+  awayScore     Int?
+  
+  sport         Sport    @default(NFL)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  week          Week     @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  picks         Pick[]
+}
+
+model Pick {
+  id         String   @id @default(cuid())
+  userId     String
+  gameId     String
+  
+  pickedTeam String   // Team name user picked
+  spread     Float    // Spread at time of pick
+  
+  result     PickResult? // WIN, LOSS, PUSH
+  points     Float?   // Points earned/lost
+  
+  createdAt  DateTime @default(now())
+  
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game       Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, gameId])
+}
+
+enum Sport {
+  NFL
+  AFL
+  NRL
+}
+
+enum PickFormat {
+  FIVE_GAMES
+  ALL_GAMES
+  PRIMETIME_ONLY
+  CUSTOM
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum PickResult {
+  WIN
+  LOSS
+  PUSH
+  PENDING
+}
