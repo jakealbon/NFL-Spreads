@@ -19,7 +19,14 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// FIXED: Enable CORS for all origins
+app.use(cors({
+  origin: '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 // ============================================
@@ -217,7 +224,6 @@ app.post('/api/weeks', authenticateToken, async (req: AuthRequest, res: Response
   try {
     const { leagueId, weekNum, season, startDate, endDate } = req.body;
     
-    // Check if user is admin of the league
     const membership = await prisma.leagueMembership.findUnique({
       where: {
         userId_leagueId: {
